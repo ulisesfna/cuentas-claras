@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pruebas · Cuentas Claras</title>
+  <style>
+    :root { color-scheme: light dark; --ok: #13865a; --bad: #d33a40; --muted: #6b7774; --line: #dde4e1; --bg: #ffffff; --text: #13201c; }
+    @media (prefers-color-scheme: dark) { :root { --ok: #3ccf8e; --bad: #ff6b70; --muted: #93a39e; --line: #26322f; --bg: #141c1a; --text: #e6eeeb; } }
+    body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; padding: 16px; background: var(--bg); color: var(--text); }
+    main { max-width: 860px; margin: 0 auto; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    #summary { font-weight: 700; margin: 12px 0 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); }
+    #summary.ok { color: var(--ok); } #summary.bad { color: var(--bad); }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; }
+    li { list-style: none; padding: 5px 0; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+    ul { padding: 0; margin: 0; }
+    .mark { width: 18px; flex: none; font-weight: 800; }
+    .ok .mark { color: var(--ok); } .bad .mark { color: var(--bad); }
+    .err { display: block; color: var(--bad); font-size: 13px; margin-top: 2px; }
+    .ms { margin-left: auto; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pruebas de Cuentas Claras</h1>
+    <p style="color:var(--muted);margin:0">Comprueban la lógica sin interfaz de <code>js/core</code>: períodos, calculadora, recurrentes, conversión, presupuestos, migraciones, copias, CSV, reglas, etiquetas y cifrado.</p>
+    <div id="summary">Ejecutando…</div>
+    <div id="out"></div>
+  </main>
+  <script type="module">
+    import { run } from './all.js';
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const results = await run();
+    const failed = results.filter((r) => !r.ok);
+    const sum = document.getElementById('summary');
+    sum.className = failed.length ? 'bad' : 'ok';
+    sum.textContent = failed.length ? `✗ ${failed.length} de ${results.length} pruebas fallan` : `✓ ${results.length} pruebas superadas`;
+    document.title = `${failed.length ? '✗' : '✓'} ${results.length - failed.length}/${results.length} · Pruebas`;
+    const suites = [...new Set(results.map((r) => r.suite))];
+    document.getElementById('out').innerHTML = suites.map((s) => `<h2>${esc(s)}</h2><ul>${results.filter((r) => r.suite === s).map((r) =>
+      `<li class="${r.ok ? 'ok' : 'bad'}"><span class="mark">${r.ok ? '✓' : '✗'}</span><span>${esc(r.name)}${r.ok ? '' : `<span class="err">${esc(r.error)}</span>`}</span><span class="ms">${r.ms} ms</span></li>`).join('')}</ul>`).join('');
+    window.__results = results;
+  </script>
+</body>
+</html>
