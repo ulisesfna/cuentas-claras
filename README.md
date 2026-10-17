@@ -112,6 +112,20 @@ icons/                Iconos
 Si añades un archivo a `js/`, añádelo también a la lista de `sw.js` para que funcione sin
 conexión.
 
+### Convivencia con otras apps en GitHub Pages
+
+Todas las apps publicadas en `usuario.github.io/…` comparten dominio y, con él, el
+almacenamiento del navegador. Para no interferir con ellas, Cuentas Claras:
+
+- guarda sus datos solo en claves que empiezan por `cuentas-claras:` y en la base de datos
+  IndexedDB `cuentas-claras`, y nunca borra el almacenamiento entero;
+- su service worker solo crea, usa y borra cachés que empiezan por `cuentas-claras-`, y solo
+  atiende peticiones de su propia carpeta.
+
+Cada app debe estar en su propio repositorio (`usuario.github.io/nombre-repo/`), no en el
+repositorio raíz `usuario.github.io`: un service worker en la raíz controlaría también las
+carpetas de las demás apps.
+
 Los datos se guardan en `localStorage` con la clave `cuentas-claras:v1` (en claro o como
 sobre cifrado). La fecha de la última copia y el estado de la copia automática van aparte,
 en `cuentas-claras:meta`, y el archivo elegido para la copia automática en IndexedDB.
