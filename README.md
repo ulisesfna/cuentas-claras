@@ -2,7 +2,8 @@
 
 Gestor de gastos personal inspirado en las funciones de [Monefy](https://www.monefy.com/).
 Es una aplicación web progresiva (PWA): funciona en el navegador, se puede instalar en el
-móvil o en el ordenador como una app más y sigue funcionando sin conexión.
+móvil o en el ordenador como una app más y sigue funcionando sin conexión. En Android también
+está como app normal (APK, ver «App de Android»).
 
 No tiene dependencias ni paso de compilación: HTML, CSS y JavaScript.
 
@@ -54,8 +55,8 @@ buscador y accesos directos a cada pantalla.
 
 ### Diferencias
 
-- **Sincronización en la nube**: no hay servidor, así que no se sincroniza sola. Para pasar
-  los datos de un dispositivo a otro se usa la copia de seguridad (Exportar y copias).
+- **Sincronización en la nube**: en lugar de Dropbox o Google Drive, se sincroniza con tu
+  propio servidor de Cloudflare y los datos van cifrados de extremo a extremo (ver abajo).
 - **Widget de pantalla de inicio**: las apps web no pueden crear widgets nativos.
 - **Copia automática**: usa la File System Access API, disponible en Chrome y Edge de
   escritorio. En el móvil hay que descargar la copia a mano (la app avisa a los 30 días).
@@ -73,11 +74,93 @@ El gráfico circular responde a «¿en qué gasté?» y siempre suma el 100 % de
   lista y el saldo muestran solo esos movimientos, repartidos por categoría. Los totales por
   etiqueta se ven en barras (pantalla Etiquetas y Análisis).
 
+## Sincronización entre dispositivos
+
+Menú → **Sincronización** → **Activar sincronización**, y la misma contraseña de sincronización
+en cada dispositivo.
+
+**Cómo protege los datos.** Funciona igual que la de «Mi calendario»:
+
+- De la contraseña se derivan (PBKDF2-SHA-256, 600.000 iteraciones) dos cosas independientes:
+  el identificador y el código de acceso de tu copia en el servidor, y la clave AES-GCM de
+  256 bits con la que se cifran los datos **en el dispositivo**.
+- El servidor solo guarda texto cifrado: sin la contraseña no se puede leer, ni siquiera
+  encontrar tu copia. La contraseña no se guarda; la clave queda en el dispositivo como no
+  exportable (IndexedDB).
+- Cuentas Claras usa otra «sal» al derivar el identificador, así que en el mismo servidor su
+  copia está separada de la del calendario aunque uses la misma contraseña.
+
+**Cómo fusiona.** Tres bandas: compara lo de este dispositivo, lo del servidor y lo último
+sincronizado (`js/core/sync.js`, con pruebas en `tests/sync.test.js`):
+
+- Se respetan los cambios y los borrados de cada lado. Si dos dispositivos cambian el mismo
+  movimiento, se juntan los campos (y las etiquetas); si tocan el mismo campo, gana el último.
+- Si uno borra algo que otro acababa de modificar, se conserva.
+- Las repeticiones de los recurrentes tienen un identificador fijo (`regla@fecha`), así que
+  dos dispositivos que las generan por su cuenta no las duplican.
+- Un dispositivo nuevo sin movimientos recibe lo del servidor; uno con datos los junta.
+- Restaurar una copia o borrar los datos con la sincronización activa solo suma: no borra nada
+  en los demás dispositivos.
+- No se sincronizan el tema, la vista ni el código de bloqueo, que son de cada dispositivo.
+
+**Servidor.** Por defecto, el Worker de «Mi calendario» (`js/config.js`), que ya tiene las rutas
+`/sync/get` y `/sync/put`. Se puede cambiar en la app.
+
+- El plan gratuito de Cloudflare KV permite 1.000 escrituras al día, compartidas entre las apps
+  que usen ese Worker. Cada sincronización con cambios es una escritura: con un uso normal sobra.
+- Si prefieres un servidor solo para Cuentas Claras:
+  1. En Cloudflare, crea un Worker nuevo y pega el código de `servidor-sync/worker.js`.
+  2. En Storage → KV, crea un espacio y enlázalo al Worker con el nombre `KV`.
+  3. Pulsa Deploy y escribe la dirección del Worker en Menú → Sincronización → Tu servidor.
+
+## App de Android (APK)
+
+Igual que «Mi calendario» y «Mi aventura»: GitHub fabrica la app sola cada vez que subes cambios
+y la deja en **Releases**. Es la misma app web dentro de un envoltorio de Android (Capacitor), así
+que todo funciona igual, con estas diferencias:
+
+- Las copias de seguridad y los CSV se guardan con el menú **Compartir** (Drive, Archivos, correo…).
+- El botón **atrás** de Android cierra la pantalla o el diálogo de encima; en la principal, minimiza.
+- Avisa cuando hay una versión nueva («Descargar»), que se instala encima **conservando los datos**.
+- No usa service worker: la app ya está en el móvil y funciona sin conexión.
+
+Enlace fijo de descarga:
+**`https://github.com/TU-USUARIO/TU-REPOSITORIO/releases/latest/download/CuentasClaras.apk`**
+(en la web publicada también aparece en el menú → «App de Android»).
+
+**Preparación (una sola vez)**
+
+1. Sube a GitHub todo como siempre, **incluida la carpeta `android-app`**. No subas copias de
+   seguridad (`cuentas-claras-*.json`) ni CSV del banco: el repositorio es público.
+2. **La llave de firma:** en el repositorio → **Settings → Secrets and variables → Actions → New
+   repository secret** → *Name*: **`APK_KEYSTORE`** → *Secret*: pega el contenido de
+   **`APK_KEYSTORE.txt`** de la carpeta `llave-apk` (la misma llave del Calendario) → **Add secret**.
+3. **El fabricante:** **Add file → Create new file** → nombre exacto **`.github/workflows/apk.yml`**
+   → pega el contenido de **`android-app/apk.yml`** → **Commit changes**.
+4. Pestaña **Actions**: «App Android (APK)» tarda unos 5 minutos. Con ✅, el APK está en
+   **Releases**. Si sale ❌, abre el paso en rojo y haz una captura.
+
+**Pasar tus datos a la app** (la app y la web guardan cada una los suyos)
+
+- Con sincronización: en la app, Menú → Sincronización → Activar, con la misma contraseña.
+- Sin ella: en la web, Exportar y copias → Descargar copia; en la app, Exportar y copias →
+  Restaurar → **Reemplazar todo** (si la copia está cifrada, te pedirá el código).
+
+Después, conviene dejar de usar la versión web en ese móvil para no apuntar en dos sitios.
+
+⚠️ Si desinstalas la app se borran sus datos. Ten la sincronización activa o haz copias.
+
+**Cómo se fabrica:** `android-app/preparar.py` copia la web a `www/` (sin `sw.js` ni `tests/`) y
+anota el número de compilación en `apk-version.json`; `npx cap add android` crea el proyecto;
+`android-app/parchear.py` pone el icono, la pantalla de carga, el color de la barra de estado, la
+versión y la firma. El código propio de la app para Android está en `js/ui/native.js`: en el
+navegador no hace nada.
+
 ## Pruebas
 
 La lógica que no depende de la pantalla (períodos, conversión, recurrentes con fin de mes,
-presupuestos, migraciones, validación y combinación de copias, CSV, reglas, etiquetas y
-cifrado) tiene pruebas automáticas en `tests/`.
+presupuestos, migraciones, validación y combinación de copias, CSV, reglas, etiquetas,
+cifrado y fusión de la sincronización) tiene pruebas automáticas en `tests/`.
 
 - En el navegador: con el servidor en marcha, abre <http://localhost:5173/tests/>.
 - Con Node 20 o superior:
@@ -94,6 +177,7 @@ Para añadir pruebas, crea un `tests/*.test.js` y añádelo a `tests/all.js`.
 index.html            Estructura de la pantalla principal
 css/styles.css        Estilos (tema claro y oscuro, móvil y escritorio)
 js/main.js            Punto de entrada: eventos globales y arranque
+js/config.js          Servidor de sincronización por defecto
 js/core/              Lógica pura, sin DOM (se prueba en tests/)
   util, format          Fechas, números y formato
   periods, calc         Períodos de la vista y calculadora
@@ -102,7 +186,12 @@ js/core/              Lógica pura, sin DOM (se prueba en tests/)
   tags, rules, csv      Etiquetas, reglas de categorización e importación/exportación CSV
   model, validate,      Modelo de datos y migraciones, validación de copias,
   merge, crypto         combinación de copias y cifrado
-js/ui/                Pantallas (una por archivo) y piezas comunes (dom.js, store.js)
+  sync                  Fusión a tres bandas para la sincronización
+js/ui/                Pantallas (una por archivo) y piezas comunes (dom.js, store.js, idb.js)
+  sync.js               Sincronización: red, claves y pantalla
+  native.js             App de Android: Compartir, botón atrás y aviso de versión nueva
+android-app/          Envoltorio de Android (Capacitor) y apk.yml para GitHub Actions
+servidor-sync/        Worker de Cloudflare opcional, solo para la sincronización
 tests/                Pruebas (index.html para el navegador, run.mjs para Node)
 sw.js                 Service worker (modo sin conexión)
 manifest.webmanifest  Datos para instalar la app

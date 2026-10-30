@@ -15,8 +15,9 @@ export let vault = null; // { key, salt, iter, lock } mientras los datos están 
 export function setVault(v) { vault = v; }
 export let readOnly = false; // datos de una versión más nueva: no se sobrescriben
 export function setReadOnly(v) { readOnly = v; }
-// La copia automática se engancha aquí para enterarse de cada guardado.
-export const hooks = { afterSave: () => {} };
+// La copia automática y la sincronización se apuntan aquí para enterarse de cada guardado.
+export const saveListeners = new Set();
+const notifySaved = () => saveListeners.forEach((f) => { try { f(); } catch (e) { /* un oyente no frena a los demás */ } });
 
 export function readStored() {
   let raw = null;
@@ -49,7 +50,7 @@ export let saveChain = Promise.resolve();
 let saveQueued = false;
 export function save() {
   if (!S || readOnly) return;
-  if (!vault) { writeStorage(JSON.stringify(S)); hooks.afterSave(); return; }
+  if (!vault) { writeStorage(JSON.stringify(S)); notifySaved(); return; }
   if (saveQueued) return;
   saveQueued = true;
   saveChain = saveChain.then(async () => {
@@ -57,7 +58,7 @@ export function save() {
     const v = vault;
     if (!v) { writeStorage(JSON.stringify(S)); return; }
     writeStorage(JSON.stringify(await seal(v, S)));
-    hooks.afterSave();
+    notifySaved();
   }).catch(() => toast('No se pudieron cifrar los datos al guardar.'));
 }
 

@@ -13,6 +13,8 @@ import { hasTag } from '../core/tags.js';
 import { $, $$, catIcon, icon, reducedMotion, stack, TRANSFER_ICO } from './dom.js';
 import { META, S, save } from './store.js';
 import { auto } from './backup.js';
+import { syncStatus } from './sync.js';
+import { NATIVE } from './native.js';
 
 const RING_SLOTS = [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [5, 4], [5, 3], [5, 2], [5, 1], [4, 1], [3, 1], [2, 1]];
 export const expanded = new Set();
@@ -288,7 +290,12 @@ export function renderNotice() {
   const box = (ico, text, actions) => `<div class="notice"><span class="notice-ico" aria-hidden="true">${ico}</span><p>${text}</p>
     <div class="notice-actions">${actions.map(([a, l, cls]) => `<button class="btn sm ${cls || ''}" data-notice="${a}">${l}</button>`).join('')}</div></div>`;
   let html = '';
-  if (auto.state === 'paused') {
+  const sync = syncStatus();
+  if (sync.enabled && sync.state === 'needs-pass') {
+    html = box('🔑', `<b>La sincronización necesita tu contraseña.</b> ${esc(sync.error || '')}`, [['sync', 'Escribirla', 'btn-primary']]);
+  } else if (sync.enabled && sync.state === 'needs-update') {
+    html = box('⬆️', `<b>No se puede sincronizar.</b> ${esc(sync.error || '')}`, [['reload', 'Recargar', 'btn-primary']]);
+  } else if (auto.state === 'paused') {
     html = box('⏸️', '<b>La copia automática está en pausa.</b> El navegador necesita que vuelvas a darle permiso para escribir en el archivo.', [['resume', 'Reanudar', 'btn-primary']]);
   } else if (auto.state === 'error') {
     html = box('⚠️', `<b>No se pudo escribir la copia automática.</b> ${esc((META.auto && META.auto.error) || '')}`, [['data', 'Revisar', 'btn-primary']]);
@@ -296,7 +303,7 @@ export function renderNotice() {
     const msg = META.lastBackupAt
       ? `<b>Tu última copia de seguridad fue hace ${backupAgeDays()} días.</b>`
       : '<b>Aún no has hecho ninguna copia de seguridad.</b>';
-    html = box('💾', `${msg} Si se borran los datos del navegador, perderías tus movimientos.`, [['snooze', 'Más tarde'], ['backup', 'Hacer copia', 'btn-primary']]);
+    html = box('💾', `${msg} Si se borran los datos ${NATIVE ? 'de la app' : 'del navegador'}, perderías tus movimientos.`, [['snooze', 'Más tarde'], ['backup', 'Hacer copia', 'btn-primary']]);
   }
   el.innerHTML = html;
   el.hidden = !html;

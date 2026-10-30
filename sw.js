@@ -5,7 +5,7 @@
 // cachés. Por eso este service worker solo crea, consulta y borra cachés que empiezan por PREFIX
 // y solo atiende peticiones de su propia carpeta: actualizar esta app no toca las demás.
 const PREFIX = 'cuentas-claras-';
-const CACHE = PREFIX + 'v5';
+const CACHE = PREFIX + 'v7';
 const ASSETS = [
   './',
   './index.html',
@@ -14,10 +14,11 @@ const ASSETS = [
   './icons/icon.svg',
   './icons/icon-maskable.svg',
   './js/main.js',
+  './js/config.js',
   ...['util', 'constants', 'format', 'periods', 'calc', 'tags', 'ledger', 'budget', 'recurring', 'model', 'validate',
-    'merge', 'crypto', 'rules', 'csv'].map((m) => `./js/core/${m}.js`),
-  ...['store', 'dom', 'screen', 'tx-editor', 'tags', 'categories', 'accounts', 'period', 'recurring', 'budget', 'backup',
-    'security', 'analysis', 'importer', 'menu', 'help'].map((m) => `./js/ui/${m}.js`),
+    'merge', 'crypto', 'rules', 'csv', 'sync'].map((m) => `./js/core/${m}.js`),
+  ...['store', 'dom', 'idb', 'screen', 'tx-editor', 'tags', 'categories', 'accounts', 'period', 'recurring', 'budget', 'backup',
+    'security', 'analysis', 'importer', 'menu', 'help', 'sync', 'native'].map((m) => `./js/ui/${m}.js`),
 ];
 
 self.addEventListener('install', (e) => {

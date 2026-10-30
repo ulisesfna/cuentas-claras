@@ -21,6 +21,8 @@ import { hasCode, lockEl, showBlocked, showLock } from './ui/security.js';
 import { openAnalysis } from './ui/analysis.js';
 import { setTagFilter } from './ui/tags.js';
 import { openHelp } from './ui/help.js';
+import { initSync, openSync } from './ui/sync.js';
+import { checkUpdate, NATIVE, onBackButton, onVisibility } from './ui/native.js';
 
 function bind() {
   $$('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)));
@@ -43,6 +45,8 @@ function bind() {
     else if (a === 'snooze') { META.snoozeUntil = Date.now() + 7 * 86400000; saveMeta(); renderNotice(); toast('Te lo recordaremos dentro de una semana'); }
     else if (a === 'resume') await resumeAutoBackup();
     else if (a === 'data') openData();
+    else if (a === 'sync') openSync();
+    else if (a === 'reload') location.reload();
   });
   $('#upcoming').addEventListener('click', (e) => {
     const t = e.target.closest('[data-tx]');
@@ -106,11 +110,18 @@ function bind() {
   });
 
   let hiddenAt = 0;
-  document.addEventListener('visibilitychange', () => {
+  onVisibility((visible) => {
     if (!S) return;
-    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (!visible) { hiddenAt = Date.now(); return; }
     if (generateRecurring(S)) { save(); refreshAll(); }
     if (hasCode() && S.settings.autoLock && hiddenAt && Date.now() - hiddenAt > 60000) showLock();
+  });
+  // Botón «atrás» de Android: cierra el diálogo o la pantalla de encima; si no hay, minimiza.
+  onBackButton(() => {
+    if (lockEl) return false;
+    if ($('.dialog-ov')) { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return true; }
+    if (stack.length) { closeSheet(); return true; }
+    return false;
   });
   // Mantiene sincronizadas varias pestañas abiertas (también con los datos cifrados).
   window.addEventListener('storage', async (e) => {
@@ -148,7 +159,15 @@ async function init() {
   if (!st.envelope) await showLock();
   if (st.note === 'corrupt') toast('Los datos guardados estaban dañados: se han apartado y la app empieza de cero. Puedes descargarlos en Exportar y copias.', null, 9000);
   initAutoBackup();
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  initSync();
+  if (NATIVE) {
+    // Dentro de la APK la app ya está en el móvil: no hace falta service worker. Solo se mira si hay versión nueva.
+    document.documentElement.classList.add('native');
+    setTimeout(async () => {
+      const up = await checkUpdate().catch(() => null);
+      if (up) toast(`Hay una versión nueva de la app (Android 1.${up.build})`, { label: 'Descargar', run: () => { location.href = up.url; } }, 30000);
+    }, 5000);
+  } else if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 }

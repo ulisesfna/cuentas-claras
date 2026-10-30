@@ -1,5 +1,6 @@
 // Piezas de interfaz reutilizables: iconos, hojas (modales), diálogos y avisos.
 import { esc, uid } from '../core/util.js';
+import { NATIVE, shareFile } from './native.js';
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -42,6 +43,8 @@ const ICONS = {
   hash: '<path d="M5 9h14M4 15h14M10 3 8 21M16 3l-2 18"/>',
   wand: '<path d="m4 20 11-11"/><path d="m14 4 1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/><path d="m19 11 .7 1.3L21 13l-1.3.7L19 15l-.7-1.3L17 13l1.3-.7z"/>',
   inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
 };
 export const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 export function catIcon(c, size) {
@@ -161,7 +164,9 @@ export function shake(el) {
   void el.offsetWidth;
   el.classList.add('shake');
 }
-export function download(filename, content, mime) {
+// Descarga un archivo; en la app de Android abre «Compartir». Devuelve false si se cancela.
+export async function download(filename, content, mime) {
+  if (NATIVE) return shareFile(filename, content);
   const url = URL.createObjectURL(new Blob([content], { type: mime }));
   const a = document.createElement('a');
   a.href = url;
@@ -170,4 +175,5 @@ export function download(filename, content, mime) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return true;
 }

@@ -8,5 +8,6 @@ import './model.test.js';
 import './csv.test.js';
 import './rules-tags.test.js';
 import './crypto.test.js';
+import './sync.test.js';
 
 export { run } from './harness.js';

@@ -1,5 +1,5 @@
 // Movimientos recurrentes: fechas, generación automática, omisiones puntuales y previsión.
-import { addDays, addMonths, fromISO, toISO, todayISO, uid } from './util.js';
+import { addDays, addMonths, fromISO, toISO, todayISO } from './util.js';
 import { convert, creditInfo, inScope, touches, txEntries, viewCurrency } from './ledger.js';
 
 // Fecha de la repetición n (0 = la primera). Las mensuales y anuales conservan el día de inicio:
@@ -22,10 +22,15 @@ export function cloneTemplate(tpl) {
   return c;
 }
 
+// Identificador fijo de cada repetición: si dos dispositivos la generan por su cuenta antes de
+// sincronizar, es el mismo movimiento y no se duplica.
+export const occurrenceId = (rule, date) => `${rule.id}@${date}`;
+
 // Crea los movimientos vencidos hasta `today`. Las fechas de `skips` se saltan una sola vez.
 // Devuelve cuántos cambios hubo (el llamador decide si guardar).
 export function generateRecurring(S, today = todayISO()) {
   let changed = 0;
+  const ids = new Set(S.transactions.map((t) => t.id));
   for (const r of S.recurring) {
     if (!Array.isArray(r.skips)) r.skips = [];
     if (!r.active) continue;
@@ -33,7 +38,11 @@ export function generateRecurring(S, today = todayISO()) {
     while (guard++ < 3000) {
       const date = occurrenceDate(r, r.n);
       if (date > today) break;
-      if (!r.skips.includes(date)) S.transactions.push({ ...cloneTemplate(r.template), id: uid(), date, recurringId: r.id, createdAt: Date.now() });
+      const id = occurrenceId(r, date);
+      if (!r.skips.includes(date) && !ids.has(id)) {
+        S.transactions.push({ ...cloneTemplate(r.template), id, date, recurringId: r.id, createdAt: Date.parse(date) || Date.now() });
+        ids.add(id);
+      }
       r.n++;
       changed++;
     }

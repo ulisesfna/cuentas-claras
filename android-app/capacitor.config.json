@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.ulisesfna.cuentasclaras",
+  "appName": "Cuentas Claras",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -4,7 +4,8 @@ import { esc } from '../core/util.js';
 import { fmt, signCls } from '../core/format.js';
 import { netWorth } from '../core/ledger.js';
 import { monthlyBudget } from '../core/budget.js';
-import { closeSheet, icon, openSheet } from './dom.js';
+import { $, closeSheet, dialog, icon, openSheet } from './dom.js';
+import { apkDownloadURL, apkInfo, apkVersionLabel, NATIVE } from './native.js';
 import { S, save, vault } from './store.js';
 import { backupOverdue, refreshAll } from './screen.js';
 import { auto, openData } from './backup.js';
@@ -18,6 +19,7 @@ import { openAnalysis } from './analysis.js';
 import { openTags } from './tags.js';
 import { openCsvImport, openRules } from './importer.js';
 import { openHelp } from './help.js';
+import { openSync, syncLabel, syncStatus } from './sync.js';
 
 export function openMenu() {
   const sh = openSheet({ title: 'Cuentas Claras', cls: 'sheet-drawer', ovCls: 'ov-drawer' });
@@ -28,18 +30,36 @@ export function openMenu() {
     ['target', 'Presupuestos', openBudget], ['inbox', 'Importar del banco', openCsvImport],
     ['wand', 'Reglas de categorización', openRules], ['coins', 'Monedas', openCurrencies],
     ['search', 'Buscar', openSearch],
+    ['cloud', 'Sincronización', openSync, ['needs-pass', 'needs-update', 'error'].includes(syncStatus().state) && syncStatus().enabled],
     ['download', 'Exportar y copias', openData, backupOverdue() || auto.state === 'paused' || auto.state === 'error'],
     ['lock', 'Código y cifrado', openSecurity], ['sliders', 'Ajustes', openSettings], ['help', 'Guía de uso', openHelp],
   ];
+  if (!NATIVE && apkDownloadURL()) items.push(['phone', 'App de Android', openAndroidApp]);
   const nw = netWorth(S);
+  const synced = syncStatus().enabled;
   sh.body.innerHTML = `<div class="menu-total"><span>Patrimonio neto</span><strong class="${signCls(nw.total)}">${fmt(nw.total)}</strong>
       <span class="s">Liquidez ${fmt(nw.liquid)}${Math.abs(nw.debt) > 0.004 ? ` · Deudas ${fmt(nw.debt)}` : ''}</span></div>
     <nav class="menu">${items.map(([ic, label, , dot], i) => `<button class="menu-item" data-i="${i}">${icon(ic)}<span class="grow">${label}</span>${dot ? '<span class="menu-dot" aria-label="Requiere atención"></span>' : ''}</button>`).join('')}</nav>
-    <p class="menu-foot">Versión ${APP_VERSION}<br>Tus datos se guardan solo en este dispositivo.</p>`;
+    <p class="menu-foot">Versión ${APP_VERSION}<span data-apk></span><br>${synced ? `Sincronización cifrada: ${esc(syncLabel().toLowerCase())}.` : 'Tus datos se guardan solo en este dispositivo.'}</p>`;
+  apkInfo().then((i) => { const el = $('[data-apk]', sh.body); if (el && apkVersionLabel(i)) el.textContent = ` · ${apkVersionLabel(i)}`; });
   sh.body.addEventListener('click', (e) => {
     const b = e.target.closest('[data-i]');
     if (b) closeSheet(items[+b.dataset.i][2]);
   });
+}
+
+// Solo en la web publicada en GitHub Pages: cómo pasar a la app de Android.
+async function openAndroidApp() {
+  const ok = await dialog({
+    title: 'App de Android',
+    html: `<p>Cuentas Claras también está como app de Android (APK): se abre como cualquier otra app y avisa cuando hay una versión nueva.</p>
+      <p><b>Tus datos no pasan solos</b>, porque la app y esta web guardan cada una los suyos. Para llevártelos:</p>
+      <ul><li>con la <b>sincronización</b>: actívala en la app con la misma contraseña, o</li>
+      <li>con una <b>copia de seguridad</b>: descárgala aquí y, en la app, Exportar y copias → Restaurar.</li></ul>
+      <p class="muted small">Al instalar, Android puede pedir permiso para instalar apps desde el navegador. Si Play Protect avisa: Más detalles → Instalar de todas formas.</p>`,
+    buttons: [{ label: 'Cerrar', value: false }, { label: 'Descargar APK', value: true, cls: 'btn-primary' }],
+  });
+  if (ok) location.href = apkDownloadURL();
 }
 
 export function openSettings() {
@@ -65,6 +85,7 @@ export function openSettings() {
         <button class="list-row" data-go="cats">${icon('tag')}<span class="grow"><span class="t">Categorías</span></span>${icon('chevR')}</button>
         <button class="list-row" data-go="rules">${icon('wand')}<span class="grow"><span class="t">Reglas de categorización</span><span class="s">${(S.rules || []).length} regla(s)</span></span>${icon('chevR')}</button>
         <button class="list-row" data-go="sec">${icon('lock')}<span class="grow"><span class="t">Código y cifrado</span><span class="s">${vault ? 'Activado · datos cifrados' : s.pinHash ? 'Activado · datos sin cifrar' : 'Desactivado'}</span></span>${icon('chevR')}</button>
+        <button class="list-row" data-go="sync">${icon('cloud')}<span class="grow"><span class="t">Sincronización</span><span class="s">${esc(syncLabel())}</span></span>${icon('chevR')}</button>
         <button class="list-row" data-go="data">${icon('download')}<span class="grow"><span class="t">Exportar y copias de seguridad</span></span>${icon('chevR')}</button>
         <button class="list-row" data-go="help">${icon('help')}<span class="grow"><span class="t">Guía de uso</span><span class="s">Cómo funciona cada apartado</span></span>${icon('chevR')}</button>
       </div>
@@ -85,6 +106,6 @@ export function openSettings() {
     const th = e.target.closest('[data-theme-seg] [data-v]');
     if (th) { S.settings.theme = th.dataset.v; save(); refreshAll(); return; }
     const go = e.target.closest('[data-go]');
-    if (go) ({ cur: openCurrencies, budget: openBudget, cats: () => openCategories('expense'), rules: openRules, sec: openSecurity, data: openData, help: openHelp })[go.dataset.go]();
+    if (go) ({ cur: openCurrencies, budget: openBudget, cats: () => openCategories('expense'), rules: openRules, sync: openSync, sec: openSecurity, data: openData, help: openHelp })[go.dataset.go]();
   });
 }

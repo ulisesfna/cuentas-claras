@@ -10,9 +10,12 @@ import { defaultState } from '../core/model.js';
 import { generateRecurring } from '../core/recurring.js';
 import { buildExportCSV } from '../core/csv.js';
 import { $, closeSheet, confirmDialog, dialog, download, icon, openSheet, promptSecret, stack, toast } from './dom.js';
-import { cryptoOK, hooks, META, recoveryKeys, S, save, saveMeta, setS, setVault, vault } from './store.js';
+import { cryptoOK, META, recoveryKeys, S, save, saveListeners, saveMeta, setS, setVault, vault } from './store.js';
+import { idbDel, idbGet, idbSet } from './idb.js';
+import { forgetSyncBase, syncStatus } from './sync.js';
 import { backupOverdue, expanded, refreshAll, renderNotice } from './screen.js';
 import { openCsvImport } from './importer.js';
+import { NATIVE } from './native.js';
 
 // Contenido de una copia: cifrada con el mismo código si los datos están cifrados.
 export async function backupPayload() {
@@ -27,10 +30,10 @@ function markBackup() {
 }
 export async function downloadBackup() {
   try {
-    download(`cuentas-claras-copia-${todayISO()}.json`, await backupPayload(), 'application/json');
+    if (!(await download(`cuentas-claras-copia-${todayISO()}.json`, await backupPayload(), 'application/json'))) return;
     markBackup();
     refreshAll();
-    toast(vault ? 'Copia cifrada descargada' : 'Copia descargada');
+    toast(`${vault ? 'Copia cifrada' : 'Copia'} ${NATIVE ? 'guardada' : 'descargada'}`);
   } catch (e) { toast('No se pudo crear la copia'); }
 }
 
@@ -38,25 +41,9 @@ export async function downloadBackup() {
 // El archivo elegido se guarda en IndexedDB para reutilizarlo en cada visita.
 const fsSupported = typeof window.showSaveFilePicker === 'function';
 export const auto = { state: 'off', handle: null, timer: 0 };
-function idb(mode, fn) {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('cuentas-claras', 1);
-    req.onupgradeneeded = () => req.result.createObjectStore('kv');
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => {
-      const tx = req.result.transaction('kv', mode);
-      const r = fn(tx.objectStore('kv'));
-      tx.oncomplete = () => resolve(r && r.result);
-      tx.onerror = () => reject(tx.error);
-    };
-  });
-}
-const idbGet = (k) => idb('readonly', (s) => s.get(k));
-const idbSet = (k, v) => idb('readwrite', (s) => s.put(v, k));
-const idbDel = (k) => idb('readwrite', (s) => s.delete(k));
 
 export async function initAutoBackup() {
-  hooks.afterSave = scheduleAutoBackup;
+  saveListeners.add(scheduleAutoBackup);
   if (!fsSupported) return;
   try {
     const h = await idbGet('backupHandle');
@@ -173,6 +160,9 @@ async function restoreFromFile(file, sh) {
     else if (fromVault) { setVault(fromVault); inc.settings.pinHash = null; }
     inc.view = { ...keepView, account: 'all', tag: null, anchor: todayISO() };
     setS(inc);
+    // Con sincronización, restaurar una copia antigua no debe borrar lo más nuevo de los otros
+    // dispositivos: la siguiente sincronización solo sumará lo que falte.
+    await forgetSyncBase();
   }
   generateRecurring(S);
   save();
@@ -182,11 +172,12 @@ async function restoreFromFile(file, sh) {
   toast(mode === 'merge' ? 'Copia combinada con tus datos' : 'Copia restaurada');
 }
 
-export function exportCSV(onlyPeriod) {
+export async function exportCSV(onlyPeriod) {
   const { from, to } = onlyPeriod ? periodISO(S.view, S.settings) : { from: null, to: null };
   const { csv, count } = buildExportCSV(S, from, to);
-  download(`cuentas-claras-${from ? `${from}_${to}` : 'todo'}.csv`, csv, 'text/csv;charset=utf-8');
-  toast(`${count} movimiento(s) exportados`);
+  try {
+    if (await download(`cuentas-claras-${from ? `${from}_${to}` : 'todo'}.csv`, csv, 'text/csv;charset=utf-8')) toast(`${count} movimiento(s) exportados`);
+  } catch (e) { toast('No se pudo exportar'); }
 }
 
 export function openData() {
@@ -197,7 +188,9 @@ export function openData() {
       ? `<b>Última copia:</b> ${esc(relTime(META.lastBackupAt))} (${esc(dfShortY.format(new Date(META.lastBackupAt)))})`
       : '<b>Todavía no has hecho ninguna copia</b> en este dispositivo.';
     let autoHTML;
-    if (!fsSupported) {
+    if (NATIVE) {
+      autoHTML = '<p class="muted small">En la app de Android no hay copia automática en un archivo. Activa la <b>sincronización</b> (tus datos quedan también en tu servidor, cifrados) o guarda una copia a mano de vez en cuando.</p>';
+    } else if (!fsSupported) {
       autoHTML = '<p class="muted small">La copia automática en un archivo solo está disponible en Chrome y Edge de ordenador. Aquí, descarga la copia a mano de vez en cuando.</p>';
     } else if (auto.state === 'off') {
       autoHTML = `<p class="muted small">Elige un archivo (por ejemplo, dentro de una carpeta sincronizada con Drive, OneDrive o Dropbox) y la app lo actualizará sola cada vez que cambies algo.</p>
@@ -214,12 +207,12 @@ export function openData() {
     sh.body.innerHTML = `
       <div class="status-card ${overdue ? 'warn' : META.lastBackupAt ? 'ok' : ''}">
         <span>${last}</span>
-        ${overdue ? `<span>⚠ Han pasado más de ${BACKUP_WARN_DAYS} días. Si se borran los datos del navegador, perderías lo apuntado desde entonces.</span>` : ''}
+        ${overdue ? `<span>⚠ Han pasado más de ${BACKUP_WARN_DAYS} días. Si se borran los datos ${NATIVE ? 'de la app' : 'del navegador'}, perderías lo apuntado desde entonces.</span>` : ''}
       </div>
-      <p class="muted small">Tus datos se guardan solo en este navegador. Las copias sirven para recuperarlos y para pasarlos a otro dispositivo.${vault ? ' Como tus datos están cifrados, las copias también lo están: necesitarás tu código para restaurarlas.' : ''}</p>
+      <p class="muted small">Tus datos se guardan solo en ${NATIVE ? 'esta app (si la desinstalas, se borran)' : 'este navegador'}. Las copias sirven para recuperarlos y para pasarlos a otro dispositivo.${vault ? ' Como tus datos están cifrados, las copias también lo están: necesitarás tu código para restaurarlas.' : ''}</p>
       <h4 class="sub-h">Copia de seguridad</h4>
       <div class="btn-col">
-        <button class="btn btn-primary" data-a="backup">${icon('download')} Descargar copia${vault ? ' cifrada' : ''} (.json)</button>
+        <button class="btn btn-primary" data-a="backup">${icon('download')} ${NATIVE ? 'Guardar' : 'Descargar'} copia${vault ? ' cifrada' : ''} (.json)</button>
         <button class="btn" data-a="restore">${icon('upload')} Restaurar o combinar desde archivo</button>
         <input type="file" accept="application/json,.json" hidden data-file>
       </div>
@@ -246,8 +239,8 @@ export function openData() {
     const a = e.target.closest('[data-a]');
     if (!a) return;
     const act = a.dataset.a;
-    if (act === 'csv-period') exportCSV(true);
-    else if (act === 'csv-all') exportCSV(false);
+    if (act === 'csv-period') await exportCSV(true);
+    else if (act === 'csv-all') await exportCSV(false);
     else if (act === 'backup') await downloadBackup();
     else if (act === 'restore') $('[data-file]', sh.body).click();
     else if (act === 'import') { openCsvImport(); return; }
@@ -258,13 +251,18 @@ export function openData() {
     else if (act === 'recovery') {
       const dump = {};
       recoveryKeys().forEach((k) => { try { dump[k] = localStorage.getItem(k); } catch (err) { /* ignorar */ } });
-      download(`cuentas-claras-datos-apartados-${todayISO()}.json`, JSON.stringify(dump, null, 2), 'application/json');
+      await download(`cuentas-claras-datos-apartados-${todayISO()}.json`, JSON.stringify(dump, null, 2), 'application/json').catch(() => toast('No se pudo guardar el archivo'));
     } else if (act === 'wipe') {
-      if (!(await confirmDialog('Se borrarán todas las cuentas, categorías y movimientos de este dispositivo. ¿Has descargado una copia?', { ok: 'Borrar todo', danger: true }))) return;
+      const synced = syncStatus().enabled;
+      const msg = synced
+        ? 'Se borrarán las cuentas, categorías y movimientos de este dispositivo. Como la sincronización está activa, volverán a descargarse de tu servidor: si quieres que este dispositivo empiece de cero, desconecta antes la sincronización. ¿Continuar?'
+        : 'Se borrarán todas las cuentas, categorías y movimientos de este dispositivo. ¿Has descargado una copia?';
+      if (!(await confirmDialog(msg, { ok: 'Borrar todo', danger: true }))) return;
       const theme = S.settings.theme;
       const fresh = defaultState();
       fresh.settings.theme = theme;
       setS(fresh);
+      await forgetSyncBase();
       save();
       expanded.clear();
       closeSheet();

@@ -12,6 +12,7 @@ import { openSecurity } from './security.js';
 import { openAnalysis } from './analysis.js';
 import { openTags } from './tags.js';
 import { openCsvImport, openRules } from './importer.js';
+import { openSync } from './sync.js';
 
 const HELP = [
   {
@@ -188,7 +189,22 @@ const HELP = [
       <li><b>Restaurar o combinar:</b> la copia se revisa entera antes de tocar nada. <b>Combinar</b> añade lo que falta sin duplicar; <b>Reemplazar</b> deja solo la copia.</li>
       <li><b>Exportar a CSV</b> (para Excel): con columnas de etiquetas y una fila por cada parte de un gasto dividido.</li>
     </ul>
-    <p class="tip">⚠️ Los datos solo existen en este navegador. Haz copias de vez en cuando.</p>` },
+    <p class="tip">⚠️ Los datos solo existen en este navegador (o en la app de Android, donde se borran si la desinstalas). Haz copias de vez en cuando o activa la sincronización.</p>` },
+  {
+    icon: '☁️', title: 'Sincronización entre dispositivos', open: 'sync', body: `
+    <p>Menú → <b>Sincronización</b>. Mantiene tus datos iguales en el móvil, el ordenador y donde uses la app, a través de tu propio servidor de Cloudflare (por defecto, el mismo que usa «Mi calendario»).</p>
+    <ul>
+      <li><b>Activar:</b> pulsa <b>Activar sincronización</b> y escribe una <b>contraseña de sincronización</b> (al menos 10 caracteres; mejor una frase de varias palabras). La primera vez te pedirá repetirla. En los demás dispositivos, escribe <b>la misma</b>.</li>
+      <li><b>Privacidad:</b> los datos se cifran en tu dispositivo (AES-GCM de 256 bits, con una clave derivada de la contraseña por PBKDF2-SHA-256 con 600.000 iteraciones) antes de enviarse. El servidor solo guarda texto cifrado; ni Cloudflare ni nadie sin tu contraseña puede leerlo, ni siquiera encontrar tu copia. La contraseña no se guarda en ningún sitio.</li>
+      <li><b>Cuándo sincroniza:</b> unos segundos después de cada cambio, al abrir la app, al volver a ella y cada pocos minutos. Sin conexión todo funciona igual y se sincroniza al recuperarla. También puedes pulsar <b>Sincronizar ahora</b>.</li>
+      <li><b>Cambios a la vez:</b> si cambias cosas distintas en dos dispositivos, se juntan (también las etiquetas). Si cambias lo mismo, gana el último en sincronizar. Lo que borras en uno se borra en los demás, salvo que en otro se hubiera modificado mientras tanto: entonces se conserva.</li>
+      <li><b>Recurrentes:</b> si dos dispositivos apuntan el mismo recibo antes de sincronizar, no se duplica.</li>
+      <li><b>Primera vez:</b> un dispositivo sin movimientos recibe lo del servidor; uno que ya tenía datos los junta con los del servidor (las cuentas y categorías con el mismo nombre se tratan como la misma).</li>
+      <li><b>Qué no se sincroniza:</b> el tema, la vista, la etiqueta filtrada y el código de bloqueo, que son de cada dispositivo.</li>
+      <li><b>Restaurar una copia o borrar los datos</b> con la sincronización activa no borra nada en los demás dispositivos: lo que falte volverá del servidor. Para que un dispositivo empiece de cero, <b>desconéctalo</b> antes.</li>
+      <li>Si aparece «La sincronización necesita tu contraseña», vuelve a escribirla (por ejemplo, si la cambiaste en otro dispositivo).</li>
+    </ul>
+    <p class="tip">⚠️ Si olvidas la contraseña de sincronización no se puede recuperar la copia del servidor, pero tus datos siguen en cada dispositivo: desconecta y crea una nueva. Sigue haciendo copias de seguridad de vez en cuando.</p>` },
   {
     icon: '🔒', title: 'Código y cifrado', open: 'security', body: `
     <ul>
@@ -199,7 +215,8 @@ const HELP = [
     <p class="tip">⚠️ Si olvidas el código no hay forma de recuperar los datos cifrados.</p>` },
   {
     icon: '📲', title: 'Instalar y usar sin conexión', body: `
-    <p><b>Android (Chrome):</b> ⋮ → Instalar aplicación. <b>iPhone (Safari):</b> Compartir → Añadir a pantalla de inicio. <b>Ordenador:</b> icono de instalar en la barra de direcciones. Solo hace falta internet la primera vez. Cada navegador y dispositivo tiene sus propios datos: usa la copia de seguridad (Combinar) para juntarlos.</p>` },
+    <p><b>App de Android (recomendada en Android):</b> en la web, menú → <b>App de Android</b> → Descargar APK, y ábrela para instalarla. Funciona sin conexión, el botón «atrás» cierra pantallas y avisa cuando hay versión nueva (se instala encima conservando tus datos). Las copias y los CSV se guardan con el menú <b>Compartir</b> (Drive, Archivos, correo…). La app y la web tienen datos separados: usa la sincronización o una copia para pasarlos.</p>
+    <p><b>Como web:</b> <b>Android (Chrome):</b> ⋮ → Instalar aplicación. <b>iPhone (Safari):</b> Compartir → Añadir a pantalla de inicio. <b>Ordenador:</b> icono de instalar en la barra de direcciones. Solo hace falta internet la primera vez. Cada navegador y dispositivo tiene sus propios datos: activa la <b>sincronización</b> para tenerlos iguales en todos, o usa la copia de seguridad (Combinar) para juntarlos a mano.</p>` },
   {
     icon: '⌨️', title: 'Atajos de teclado', body: `
     <ul>
@@ -213,7 +230,7 @@ const HELP = [
     <p><b>¿Por qué las etiquetas no salen en el gráfico circular?</b><br>Porque un movimiento puede tener varias y sus totales se solaparían. Usa la etiqueta como filtro: el gráfico te dirá en qué categorías se fue ese dinero.</p>
     <p><b>¿Qué diferencia hay entre dividir un gasto y etiquetarlo?</b><br>Dividir reparte el <i>importe</i> entre categorías (40 € comida + 12 € limpieza). La etiqueta no reparte nada: marca el movimiento entero con un motivo (#cumpleaños-ana).</p>
     <p><b>¿Por qué una transferencia no aparece en el gráfico?</b><br>Mover dinero entre tus cuentas no es un gasto.</p>
-    <p><b>¿Mis datos se envían a algún sitio?</b><br>No. Todo se guarda en tu dispositivo; nada sale de él salvo los archivos que tú exportes.</p>` },
+    <p><b>¿Mis datos se envían a algún sitio?</b><br>Sin sincronización, no: todo se guarda en tu dispositivo y nada sale de él salvo los archivos que tú exportes. Con sincronización, se envían a tu servidor <i>ya cifrados</i>, y solo tus dispositivos con la contraseña pueden leerlos.</p>` },
 ];
 
 export function openHelp() {
@@ -234,6 +251,7 @@ export function openHelp() {
     search: ['Abrir búsqueda', openSearch],
     data: ['Abrir Exportar y copias', openData],
     security: ['Abrir Código y cifrado', openSecurity],
+    sync: ['Abrir Sincronización', openSync],
     settings: ['Abrir Ajustes', () => import('./menu.js').then((m) => m.openSettings())],
   };
   const sh = openSheet({ title: 'Guía de uso', cls: 'sheet-tall' });
