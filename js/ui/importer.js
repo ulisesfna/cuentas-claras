@@ -6,7 +6,7 @@ import {
   buildRows, decodeBytes, detectDelimiter, detectHeaderRow, guessMapping, headerSignature, parseCSV, prepareImport,
 } from '../core/csv.js';
 import { matchRule, suggestKeyword } from '../core/rules.js';
-import { $, $$, catIcon, closeSheet, confirmDialog, icon, openSheet, shake, toast } from './dom.js';
+import { $, $$, catIcon, closeSheet, confirmDialog, icon, openSheet, pickFile, shake, toast } from './dom.js';
 import { S, save } from './store.js';
 import { refreshAll } from './screen.js';
 
@@ -33,7 +33,6 @@ export function openCsvImport() {
       <p>Descarga desde la web o la app de tu banco los movimientos en formato <b>CSV</b> (a veces aparece como «Exportar a Excel (CSV)» o «Descargar movimientos»). Después elígelo aquí.</p>
       <label class="field"><span>¿De qué cuenta es el extracto?</span><select data-acc>${accOptions(st.accountId)}</select></label>
       <button class="btn btn-primary btn-block" data-pick>${icon('inbox')} Elegir archivo CSV</button>
-      <input type="file" accept=".csv,text/csv,text/plain" hidden data-file>
       <ul class="muted small hints">
         <li>Se reconocen el separador, la codificación (también la de Excel en Windows) y el formato de fechas e importes.</li>
         <li>Nada se importa hasta que revises los movimientos en el último paso. Los que ya estén en la app se marcan como duplicados.</li>
@@ -200,7 +199,7 @@ export function openCsvImport() {
   };
 
   sh.body.addEventListener('click', async (e) => {
-    if (e.target.closest('[data-pick]')) { $('[data-file]', sh.body).click(); return; }
+    if (e.target.closest('[data-pick]')) { const f = await pickFile('.csv,text/csv,text/plain'); if (f) loadFile(f); return; }
     if (e.target.closest('[data-back-file]')) { st.step = 'file'; draw(); return; }
     if (e.target.closest('[data-back-map]')) { st.step = 'map'; draw(); return; }
     if (e.target.closest('[data-to-review]')) { toReview(); return; }
@@ -216,7 +215,6 @@ export function openCsvImport() {
   });
   sh.body.addEventListener('change', (e) => {
     const t = e.target;
-    if (t.matches('[data-file]')) { const f = t.files && t.files[0]; t.value = ''; if (f) loadFile(f); return; }
     if (t.matches('[data-acc]')) { st.accountId = t.value; return; }
     if (t.dataset.m) {
       const k = t.dataset.m;

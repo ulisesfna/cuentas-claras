@@ -9,7 +9,7 @@ import { mergeData } from '../core/merge.js';
 import { defaultState } from '../core/model.js';
 import { generateRecurring } from '../core/recurring.js';
 import { buildExportCSV } from '../core/csv.js';
-import { $, closeSheet, confirmDialog, dialog, download, icon, openSheet, promptSecret, stack, toast } from './dom.js';
+import { closeSheet, confirmDialog, dialog, download, icon, openSheet, pickFile, promptSecret, stack, toast } from './dom.js';
 import { cryptoOK, META, recoveryKeys, S, save, saveListeners, saveMeta, setS, setVault, vault } from './store.js';
 import { idbDel, idbGet, idbSet } from './idb.js';
 import { forgetSyncBase, syncStatus } from './sync.js';
@@ -214,7 +214,6 @@ export function openData() {
       <div class="btn-col">
         <button class="btn btn-primary" data-a="backup">${icon('download')} ${NATIVE ? 'Guardar' : 'Descargar'} copia${vault ? ' cifrada' : ''} (.json)</button>
         <button class="btn" data-a="restore">${icon('upload')} Restaurar o combinar desde archivo</button>
-        <input type="file" accept="application/json,.json" hidden data-file>
       </div>
       <h4 class="sub-h">Copia automática</h4>
       ${autoHTML}
@@ -242,7 +241,10 @@ export function openData() {
     if (act === 'csv-period') await exportCSV(true);
     else if (act === 'csv-all') await exportCSV(false);
     else if (act === 'backup') await downloadBackup();
-    else if (act === 'restore') $('[data-file]', sh.body).click();
+    else if (act === 'restore') {
+      const file = await pickFile('application/json,.json');
+      if (file) await restoreFromFile(file, stack.includes(sh) ? sh : null);
+    }
     else if (act === 'import') { openCsvImport(); return; }
     else if (act === 'auto-on') await enableAutoBackup();
     else if (act === 'auto-resume') await resumeAutoBackup();
@@ -271,11 +273,5 @@ export function openData() {
       return;
     }
     draw();
-  });
-  sh.body.addEventListener('change', (e) => {
-    if (!e.target.matches('[data-file]')) return;
-    const file = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if (file) restoreFromFile(file, sh);
   });
 }

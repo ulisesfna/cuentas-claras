@@ -164,6 +164,23 @@ export function shake(el) {
   void el.offsetWidth;
   el.classList.add('shake');
 }
+// Abre el selector de archivos y devuelve el elegido (o null). El campo va fuera de las hojas para
+// que redibujarlas mientras se elige (al sincronizar, por ejemplo) no pierda el archivo. En el móvil
+// no se filtra por tipo: Android deja en gris los .json y .csv que Drive o WhatsApp no marcan
+// como tales, y el contenido ya se comprueba al leerlo.
+export function pickFile(accept) {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.hidden = true;
+    if (accept && !NATIVE && !matchMedia('(pointer: coarse)').matches) input.accept = accept;
+    input.addEventListener('change', () => { resolve((input.files && input.files[0]) || null); input.remove(); }, { once: true });
+    input.addEventListener('cancel', () => { resolve(null); input.remove(); }, { once: true });
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
 // Descarga un archivo; en la app de Android abre «Compartir». Devuelve false si se cancela.
 export async function download(filename, content, mime) {
   if (NATIVE) return shareFile(filename, content);
