@@ -62,19 +62,19 @@ export function apkDownloadURL() {
   return m && repo ? `https://github.com/${m[1]}/${repo}/releases/latest/download/${APK_NAME}` : null;
 }
 
-// ¿Hay una APK más nueva en GitHub? Como mucho una consulta cada 12 h. Devuelve
-// { build, url } o null.
-export async function checkUpdate() {
+// Última APK publicada en GitHub: { current, latest, url }, o null si esta compilación no sabe de
+// qué repositorio viene. Sin `force`, como mucho una consulta cada 12 h. Lanza un error sin conexión.
+export async function latestRelease({ force = false } = {}) {
   const i = await apkInfo();
   if (!i || !i.repo || !i.build) return null;
   let last = null;
   try { last = JSON.parse(localStorage.getItem(UPDATE_KEY)); } catch (e) { /* nada guardado */ }
-  if (!last || Date.now() - last.at > 12 * 3600e3) {
-    const r = await fetch(`https://api.github.com/repos/${i.repo}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
-    if (!r || !r.ok) return null;
+  if (force || !last || Date.now() - last.at > 12 * 3600e3) {
+    const r = await fetch(`https://api.github.com/repos/${i.repo}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!r.ok) throw new Error(`GitHub respondió ${r.status}`);
     const j = await r.json();
     last = { at: Date.now(), latest: parseInt(String(j.tag_name || '').replace(/\D/g, ''), 10) || 0 };
     try { localStorage.setItem(UPDATE_KEY, JSON.stringify(last)); } catch (e) { /* sin guardar */ }
   }
-  return last.latest > i.build ? { build: last.latest, url: `https://github.com/${i.repo}/releases/latest/download/${APK_NAME}` } : null;
+  return { current: i.build, latest: last.latest, url: `https://github.com/${i.repo}/releases/latest/download/${APK_NAME}` };
 }

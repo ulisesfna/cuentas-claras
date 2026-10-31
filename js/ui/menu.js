@@ -6,6 +6,7 @@ import { netWorth } from '../core/ledger.js';
 import { monthlyBudget } from '../core/budget.js';
 import { $, closeSheet, dialog, icon, openSheet } from './dom.js';
 import { apkDownloadURL, apkInfo, apkVersionLabel, NATIVE } from './native.js';
+import { checkForUpdates } from './update.js';
 import { S, save, vault } from './store.js';
 import { backupOverdue, refreshAll } from './screen.js';
 import { auto, openData } from './backup.js';
@@ -33,6 +34,7 @@ export function openMenu() {
     ['cloud', 'Sincronización', openSync, ['needs-pass', 'needs-update', 'error'].includes(syncStatus().state) && syncStatus().enabled],
     ['download', 'Exportar y copias', openData, backupOverdue() || auto.state === 'paused' || auto.state === 'error'],
     ['lock', 'Código y cifrado', openSecurity], ['sliders', 'Ajustes', openSettings], ['help', 'Guía de uso', openHelp],
+    ['refresh', 'Buscar actualizaciones', checkForUpdates],
   ];
   if (!NATIVE && apkDownloadURL()) items.push(['phone', 'App de Android', openAndroidApp]);
   const nw = netWorth(S);

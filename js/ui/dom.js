@@ -45,6 +45,7 @@ const ICONS = {
   inbox: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
   cloud: '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 9.5z"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>',
 };
 export const icon = (name) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
 export function catIcon(c, size) {
@@ -157,6 +158,11 @@ export function toast(msg, action, ms) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), ms || (action ? 5000 : 2600));
+}
+export function hideToast() {
+  clearTimeout(toastTimer);
+  const el = $('#toast');
+  if (el) el.classList.remove('show');
 }
 export function shake(el) {
   if (!el) return;

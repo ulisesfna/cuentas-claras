@@ -216,6 +216,7 @@ const HELP = [
   {
     icon: '📲', title: 'Instalar y usar sin conexión', body: `
     <p><b>App de Android (recomendada en Android):</b> en la web, menú → <b>App de Android</b> → Descargar APK, y ábrela para instalarla. Funciona sin conexión, el botón «atrás» cierra pantallas y avisa cuando hay versión nueva (se instala encima conservando tus datos). Las copias y los CSV se guardan con el menú <b>Compartir</b> (Drive, Archivos, correo…). La app y la web tienen datos separados: usa la sincronización o una copia para pasarlos.</p>
+    <p><b>Buscar actualizaciones</b> (menú): en la app de Android mira al momento si hay una versión nueva y te ofrece descargarla. En la web trae los archivos nuevos y recarga la app si algo ha cambiado (tus datos no se tocan).</p>
     <p><b>Como web:</b> <b>Android (Chrome):</b> ⋮ → Instalar aplicación. <b>iPhone (Safari):</b> Compartir → Añadir a pantalla de inicio. <b>Ordenador:</b> icono de instalar en la barra de direcciones. Solo hace falta internet la primera vez. Cada navegador y dispositivo tiene sus propios datos: activa la <b>sincronización</b> para tenerlos iguales en todos, o usa la copia de seguridad (Combinar) para juntarlos a mano.</p>` },
   {
     icon: '⌨️', title: 'Atajos de teclado', body: `
