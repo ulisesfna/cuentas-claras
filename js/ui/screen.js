@@ -72,7 +72,25 @@ function renderFilter(d) {
     <button class="btn sm" data-clear-tag>Quitar filtro ${icon('close')}</button>`;
 }
 
+// Categoría que se mantiene pulsada en el anillo: el resto (iconos y trozos del gráfico) se atenúa
+// y el centro muestra lo gastado en ella.
+let ringFocus = null;
+let lastView = null;
+export function setRingFocus(id) {
+  ringFocus = id;
+  applyRingFocus();
+}
+function applyRingFocus() {
+  const ring = $('#ring');
+  if (!ring || !lastView) return;
+  ring.classList.toggle('focusing', !!ringFocus);
+  $$('[data-cat], [data-seg]', ring).forEach((el) => el.classList.toggle('hl', !!ringFocus && (el.dataset.cat || el.dataset.seg) === ringFocus));
+  const center = $('.donut-center', ring);
+  if (center) center.innerHTML = centerHTML(lastView);
+}
+
 function renderOverview(d) {
+  lastView = d;
   const cats = sortedCats(S, 'expense');
   const overflow = cats.length > 16;
   const shown = overflow ? cats.slice(0, 15) : cats;
@@ -82,8 +100,10 @@ function renderOverview(d) {
     const b = catBudget(S, c, d);
     const lv = budgetLevel(s, b);
     const flag = lv === 'warn' || lv === 'over';
+    // Sin gastos en el período (y habiendo otros): más pequeña y suave, para despejar el anillo.
+    const unused = !s && d.expense > 0;
     const tip = `${c.name}${s ? ': ' + fmt(s, d.cur) : ''}${b ? ` de ${fmt(b, d.cur)} presupuestados` : ''}`;
-    return `<button class="ring-cat" data-cat="${c.id}" title="${esc(tip)}" aria-label="Añadir gasto en ${esc(c.name)}${flag ? (lv === 'over' ? ' (presupuesto superado)' : ' (cerca del límite del presupuesto)') : ''}">
+    return `<button class="ring-cat${unused ? ' unused' : ''}" data-cat="${c.id}" title="${esc(tip)}" aria-label="Añadir gasto en ${esc(c.name)}${flag ? (lv === 'over' ? ' (presupuesto superado)' : ' (cerca del límite del presupuesto)') : ''}">
       <span class="ico-wrap">${catIcon(c)}${flag ? `<span class="bud-dot ${lv}" aria-hidden="true">${lv === 'over' ? '!' : ''}</span>` : ''}</span><span class="ring-name">${esc(c.name)}</span></button>`;
   });
   if (overflow) slots.push(`<button class="ring-cat" data-more aria-label="Más categorías"><span class="cat-ico more">•••</span><span class="ring-name">Más</span></button>`);
@@ -92,6 +112,7 @@ function renderOverview(d) {
   let html = slots.map((s, i) => `<div class="slot" style="grid-row:${RING_SLOTS[i][0]};grid-column:${RING_SLOTS[i][1]}">${s}</div>`).join('');
   html += `<div class="donut-cell">${donutSVG(d)}<div class="donut-center">${centerHTML(d)}</div></div>`;
   $('#ring').innerHTML = html;
+  if (ringFocus) applyRingFocus();
 
   const bal = $('#balanceValue');
   bal.textContent = fmt(d.balance, d.cur);
@@ -109,7 +130,7 @@ function donutSVG(d) {
     for (const g of d.exp) {
       const len = (g.total / d.expense) * C;
       const vis = Math.max(len - gap, 0.8);
-      segs += `<circle r="${R}" cx="100" cy="100" fill="none" stroke="${esc(g.cat.color)}" stroke-width="${SW}" stroke-dasharray="${vis.toFixed(2)} ${(C - vis).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(g.cat.name)}: ${esc(fmt(g.total, d.cur))}</title></circle>`;
+      segs += `<circle data-seg="${esc(g.key)}" r="${R}" cx="100" cy="100" fill="none" stroke="${esc(g.cat.color)}" stroke-width="${SW}" stroke-dasharray="${vis.toFixed(2)} ${(C - vis).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(g.cat.name)}: ${esc(fmt(g.total, d.cur))}</title></circle>`;
       off += len;
     }
   }
@@ -130,6 +151,16 @@ function donutSVG(d) {
 }
 
 function centerHTML(d) {
+  const fc = ringFocus && getCategory(S, ringFocus);
+  if (fc) {
+    const g = d.exp.find((x) => x.key === fc.id);
+    const s = g ? g.total : 0;
+    const cb = catBudget(S, fc, d);
+    return `<span class="c-label c-cat">${esc(fc.name)}</span>
+      <span class="c-big ${s ? 'expense' : ''}">${fmt(s, d.cur)}</span>
+      <span class="c-sub">${s ? `${Math.round((s / d.expense) * 100)} % de los gastos` : 'Sin gastos en este período'}</span>
+      ${cb ? `<span class="c-sub">de ${fmt(cb, d.cur)} presupuestados</span>` : ''}`;
+  }
   const b = periodBudget(S, d);
   if (b != null) {
     const left = b - d.expense;
@@ -223,12 +254,13 @@ export function itemRow(t, mode, part = null) {
   let ico, title, amt;
   if (t.type === 'transfer') {
     ico = TRANSFER_ICO;
-    title = `${accName(S, t.accountId)} → ${accName(S, t.toAccountId)}`;
+    const route = `${accName(S, t.accountId)} → ${accName(S, t.toAccountId)}`;
+    title = t.note || route;
+    if (t.note) sub.push(route);
     const fc = accCur(S, t.accountId), tc = accCur(S, t.toAccountId);
     if (mode !== 'search' && acc !== 'all' && acc === t.toAccountId) amt = `<span class="amt income">+${fmt(t.toAmount, tc)}</span>`;
     else if (mode !== 'search' && acc !== 'all') amt = `<span class="amt expense">−${fmt(t.amount, fc)}</span>`;
     else amt = `<span class="amt neutral">${fmt(t.amount, fc)}</span>`;
-    if (t.note) sub.push(t.note);
   } else {
     const split = isSplit(t);
     const parts = txParts(t);
@@ -246,9 +278,11 @@ export function itemRow(t, mode, part = null) {
         sub.push(`✂ parte de ${fmt(t.amount, accCur(S, t.accountId))}`);
       }
     } else {
+      // Arriba lo que hiciste (la nota); debajo, la categoría. Sin nota, la categoría va arriba.
       const names = parts.map((p) => getCategory(S, p.categoryId).name);
-      title = split ? (names.length > 2 ? `${names[0]} + ${names.length - 1} más` : names.join(' + ')) : c.name;
-      if (t.note) sub.push(t.note);
+      const catLabel = split ? (names.length > 2 ? `${names[0]} + ${names.length - 1} más` : names.join(' + ')) : c.name;
+      title = t.note || catLabel;
+      if (t.note) sub.push(catLabel);
     }
     if (acc === 'all' || mode === 'search') sub.push(accName(S, t.accountId));
     amt = `<span class="amt ${t.type}">${t.type === 'expense' ? '−' : '+'}${fmt(shownAmount, accCur(S, t.accountId))}</span>`;

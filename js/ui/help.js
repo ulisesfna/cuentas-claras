@@ -21,7 +21,8 @@ const HELP = [
     <ul>
       <li><b>Barra superior:</b> <b>☰</b> abre el menú; el nombre del centro («Todas las cuentas») permite ver una sola cuenta; <b>⇄</b> registra una transferencia (solo si tienes dos cuentas o más); el icono de <b>gráfico</b> abre el Análisis y la <b>lupa</b>, la búsqueda.</li>
       <li><b>Barra del período:</b> las flechas <b>‹ ›</b> van al período anterior o siguiente; tocando el nombre eliges otro tipo de período o una fecha concreta.</li>
-      <li><b>Anillo de categorías:</b> alrededor del gráfico aparecen hasta 16 categorías de gasto. Al tocar una, se abre el editor con esa categoría elegida. Si tienes menos de 16 verás <b>+ Nueva</b>; si tienes más, la última posición es <b>••• Más</b>.</li>
+      <li><b>Anillo de categorías:</b> alrededor del gráfico aparecen hasta 16 categorías de gasto. Al tocar una, se abre el editor con esa categoría elegida. Si tienes menos de 16 verás <b>+ Nueva</b>; si tienes más, la última posición es <b>••• Más</b>. Las categorías sin gastos en el período salen más pequeñas y suaves, para que destaquen las que usas.</li>
+      <li><b>Mantener pulsada una categoría:</b> mientras la mantienes, las demás se atenúan (también sus trozos del gráfico) y el centro muestra cuánto llevas gastado en ella y qué parte es del total. Al soltar no se abre el editor.</li>
       <li><b>Gráfico circular:</b> cada color es una categoría y su tamaño es proporcional a lo gastado en ella. Responde a «¿en qué gasté?» y siempre suma el 100 % de los gastos: un gasto dividido aporta cada parte a su categoría.</li>
       <li><b>Centro del gráfico:</b> total de <b>ingresos</b> (verde) y <b>gastos</b> (rojo) del período. Con el modo presupuesto muestra lo que te queda disponible.</li>
       <li><b>Saldo:</b> ingresos menos gastos del período (más lo acumulado antes si activas «Arrastrar saldo»).</li>

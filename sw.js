@@ -5,7 +5,7 @@
 // cachés. Por eso este service worker solo crea, consulta y borra cachés que empiezan por PREFIX
 // y solo atiende peticiones de su propia carpeta: actualizar esta app no toca las demás.
 const PREFIX = 'cuentas-claras-';
-const CACHE = PREFIX + 'v8';
+const CACHE = PREFIX + 'v9';
 const ASSETS = [
   './',
   './index.html',

@@ -9,7 +9,7 @@ import { generateRecurring } from './core/recurring.js';
 import { todayISO } from './core/util.js';
 import { $, $$, closeSheet, icon, stack, toast } from './ui/dom.js';
 import { META, readStored, S, save, saveMeta, setS, STORAGE_KEY, vault } from './ui/store.js';
-import { expanded, refreshAll, render, renderNotice, shiftPeriod } from './ui/screen.js';
+import { expanded, refreshAll, render, renderNotice, setRingFocus, shiftPeriod } from './ui/screen.js';
 import { openTxSheet } from './ui/tx-editor.js';
 import { openAccountSwitch } from './ui/accounts.js';
 import { openCategoryForm } from './ui/categories.js';
@@ -55,7 +55,34 @@ function bind() {
   });
 
   const ring = $('#ring');
+  // Mantener pulsada una categoría la resalta (y atenúa las demás) mientras dura la pulsación;
+  // al soltar no se abre el editor.
+  let pressTimer = 0, pressStart = null, focused = false, skipClickUntil = 0;
+  const endPress = () => {
+    clearTimeout(pressTimer);
+    pressStart = null;
+    if (!focused) return;
+    focused = false;
+    skipClickUntil = Date.now() + 500;
+    setRingFocus(null);
+  };
+  ring.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-cat]');
+    if (!b || e.button > 0) return;
+    pressStart = { x: e.clientX, y: e.clientY };
+    pressTimer = setTimeout(() => {
+      focused = true;
+      setRingFocus(b.dataset.cat);
+      if (navigator.vibrate) navigator.vibrate(12);
+    }, 420);
+  });
+  ring.addEventListener('pointermove', (e) => {
+    if (pressStart && !focused && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10) endPress();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => ring.addEventListener(ev, endPress));
+  ring.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-cat]')) e.preventDefault(); });
   ring.addEventListener('click', (e) => {
+    if (Date.now() < skipClickUntil) { e.preventDefault(); return; }
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.cat) openTxSheet({ type: 'expense', categoryId: b.dataset.cat });
@@ -68,6 +95,7 @@ function bind() {
   swipeArea.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
   swipeArea.addEventListener('touchend', (e) => {
     if (sx == null) return;
+    if (focused || Date.now() < skipClickUntil) { sx = null; return; } // venía de mantener pulsada una categoría
     const t = e.changedTouches[0];
     const dx = t.clientX - sx, dy = t.clientY - sy;
     sx = null;
