@@ -5,7 +5,7 @@
 // cachés. Por eso este service worker solo crea, consulta y borra cachés que empiezan por PREFIX
 // y solo atiende peticiones de su propia carpeta: actualizar esta app no toca las demás.
 const PREFIX = 'cuentas-claras-';
-const CACHE = PREFIX + 'v9';
+const CACHE = PREFIX + 'v10';
 const ASSETS = [
   './',
   './index.html',
@@ -22,7 +22,8 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  // cache: 'reload': la copia sin conexión, siempre del servidor (no de la caché del navegador)
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -38,8 +39,12 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   // Nada fuera de la carpeta de esta app (otras apps del mismo dominio, otros sitios).
   if (req.method !== 'GET' || !req.url.startsWith(self.registration.scope)) return;
+  // no-cache: se pregunta siempre al servidor (si no ha cambiado responde «304», sin descargar nada).
+  // Así, tras publicar una versión, no se mezclan módulos nuevos con otros viejos guardados por el
+  // navegador (GitHub Pages deja guardarlos 10 minutos), que impedirían arrancar la app.
+  const net = req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req, { cache: 'no-cache' });
   e.respondWith(
-    fetch(req)
+    net
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();

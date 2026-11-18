@@ -22,7 +22,8 @@ import { openAnalysis } from './ui/analysis.js';
 import { setTagFilter } from './ui/tags.js';
 import { openHelp } from './ui/help.js';
 import { initSync, openSync } from './ui/sync.js';
-import { latestRelease, NATIVE, onBackButton, onVisibility } from './ui/native.js';
+import { confirmWebStarted, NATIVE, onBackButton, onVisibility } from './ui/native.js';
+import { initUpdates } from './ui/update.js';
 
 function bind() {
   $$('[data-icon]').forEach((el) => el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon)));
@@ -171,6 +172,8 @@ function bind() {
 
 async function init() {
   bind();
+  // App de Android: esta versión arranca (antes del código de bloqueo, que puede quedarse sin escribir)
+  confirmWebStarted();
   const st = readStored();
   if (st.newer) { showBlocked(); return; }
   if (st.envelope) await showLock(st.envelope);
@@ -189,12 +192,9 @@ async function init() {
   initAutoBackup();
   initSync();
   if (NATIVE) {
-    // Dentro de la APK la app ya está en el móvil: no hace falta service worker. Solo se mira si hay versión nueva.
+    // Dentro de la APK la app ya está en el móvil: no hace falta service worker. Se actualiza desde dentro.
     document.documentElement.classList.add('native');
-    setTimeout(async () => {
-      const up = await latestRelease().catch(() => null);
-      if (up && up.latest > up.current) toast(`Hay una versión nueva de la app (Android 1.${up.latest})`, { label: 'Descargar', run: () => { location.href = up.url; } }, 30000);
-    }, 5000);
+    initUpdates();
   } else if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

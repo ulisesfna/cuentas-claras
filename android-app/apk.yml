@@ -1,5 +1,5 @@
 # Compila la app de Android (APK) cada vez que subes cambios y la publica en «Releases».
-# Enlace fijo de descarga: https://github.com/USUARIO/REPOSITORIO/releases/latest/download/CuentasClaras.apk
+# Enlace fijo de descarga: https://github.com/ulisesfna/cuentas-claras/releases/latest/download/CuentasClaras.apk
 # Necesita el secreto APK_KEYSTORE (la misma llave que el Calendario; ver README → «App de Android»).
 # Este archivo va en el repositorio como .github/workflows/apk.yml
 name: App Android (APK)
@@ -49,6 +49,11 @@ jobs:
           echo "$APK_KEYSTORE" | base64 -d > "$RUNNER_TEMP/llave.p12"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/llave.p12" >> "$GITHUB_ENV"
 
+      # Si la parte nativa no cambia, la app instalada se actualiza sola descargando web.zip (sin instalar el APK)
+      - name: Huella de la parte nativa
+        run: |
+          echo "NATIVO=$(cat android-app/nativo/*.java android-app/parchear.py android-app/package.json android-app/capacitor.config.json .github/workflows/apk.yml | sha256sum | cut -c1-16)" >> "$GITHUB_ENV"
+
       - name: Preparar el proyecto Android
         working-directory: android-app
         run: |
@@ -62,16 +67,28 @@ jobs:
         working-directory: android-app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: App web y version.json (para las actualizaciones sin instalar)
+        run: |
+          (cd android-app/android/app/src/main/assets/public && zip -qr -X "$GITHUB_WORKSPACE/web.zip" .)
+          python3 - <<'EOF'
+          import hashlib, json, os
+          sha = hashlib.sha256(open('web.zip', 'rb').read()).hexdigest()
+          build, repo = int(os.environ['BUILD']), os.environ['REPO']
+          json.dump({'build': build, 'nativo': os.environ['NATIVO'], 'web': sha,
+                     'apk': f'https://github.com/{repo}/releases/download/v{build}/CuentasClaras.apk'}, open('version.json', 'w'))
+          print(open('version.json').read())
+          EOF
 
       - name: Publicar en Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android-app/android/app/build/outputs/apk/debug/app-debug.apk CuentasClaras.apk
+          cp android-app/android/app/build/outputs/apk/release/app-release.apk CuentasClaras.apk
           tag="v${BUILD}"
-          gh release create "$tag" CuentasClaras.apk --title "Cuentas Claras $tag" --latest \
-            --notes "Descarga **CuentasClaras.apk** en el móvil y ábrelo para instalar o actualizar (tus datos se conservan)."
+          gh release create "$tag" CuentasClaras.apk web.zip version.json --title "Cuentas Claras $tag" --latest \
+            --notes "Descarga **CuentasClaras.apk** en el móvil y ábrelo para instalar o actualizar (tus datos se conservan). Si ya tienes la app, se actualiza sola desde dentro."
           # Borrar las versiones anteriores (solo se guarda la última)
           for old in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
             if [ "$old" != "$tag" ]; then gh release delete "$old" --cleanup-tag --yes || true; fi

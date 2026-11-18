@@ -121,12 +121,12 @@ que todo funciona igual, con estas diferencias:
 
 - Las copias de seguridad y los CSV se guardan con el menú **Compartir** (Drive, Archivos, correo…).
 - El botón **atrás** de Android cierra la pantalla o el diálogo de encima; en la principal, minimiza.
-- Avisa cuando hay una versión nueva («Descargar»), que se instala encima **conservando los datos**.
+- **Se actualiza desde dentro**, sin pasar por el navegador (ver «Actualizar» más abajo).
 - No usa service worker: la app ya está en el móvil y funciona sin conexión.
 
 Enlace fijo de descarga:
-**`https://github.com/TU-USUARIO/TU-REPOSITORIO/releases/latest/download/CuentasClaras.apk`**
-(en la web publicada también aparece en el menú → «App de Android»).
+**<https://github.com/ulisesfna/cuentas-claras/releases/latest/download/CuentasClaras.apk>**
+(en la web, <https://ulisesfna.github.io/cuentas-claras/>, también aparece en el menú → «App de Android»).
 
 **Preparación (una sola vez)**
 
@@ -150,11 +150,30 @@ Después, conviene dejar de usar la versión web en ese móvil para no apuntar e
 
 ⚠️ Si desinstalas la app se borran sus datos. Ten la sincronización activa o haz copias.
 
+**Actualizar:** sube los archivos cambiados a GitHub como siempre. En unos 5 minutos GitHub publica
+la versión nueva (el APK, la app web `web.zip` y `version.json`) y la app se actualiza sola, igual
+que «Mi calendario»:
+
+- **Casi siempre** (solo cambia la app web): al abrir la app descarga la versión nueva y se recarga
+  con ella en unos segundos («Actualizando a la versión 1.N…»). No se instala nada. Si la abres con
+  algo a medias, avisa («Aplicar ahora») y si no, la usa la próxima vez. Si una versión descargada
+  no llegara a arrancar, al volver a abrir la app se vuelve sola a la que trae el APK.
+- **Si cambia la parte de Android** (`android-app/`): aviso «Hay una versión nueva de la app →
+  Actualizar». La app descarga el APK y abre el instalador de Android directamente (la primera vez
+  pide permitir que *Cuentas Claras* instale apps). Al acabar, una notificación la vuelve a abrir.
+- También a mano: menú → **Buscar actualizaciones**.
+
+Siempre se instala encima y **tus datos se conservan**. Si cambias `android-app/apk.yml`, pégalo
+también en `.github/workflows/apk.yml` (es el que usa GitHub).
+
 **Cómo se fabrica:** `android-app/preparar.py` copia la web a `www/` (sin `sw.js` ni `tests/`) y
 anota el número de compilación en `apk-version.json`; `npx cap add android` crea el proyecto;
-`android-app/parchear.py` pone el icono, la pantalla de carga, el color de la barra de estado, la
-versión y la firma. El código propio de la app para Android está en `js/ui/native.js`: en el
-navegador no hace nada.
+`android-app/parchear.py` añade el código nativo de las actualizaciones (`android-app/nativo/`), el
+icono, la pantalla de carga, el color de la barra de estado, la versión y la firma (versión
+«release», con la misma llave). `apk.yml` calcula una huella de la parte nativa: si la versión nueva
+tiene la misma, a la app instalada le basta con `web.zip`. El código propio de la app para Android
+está en `js/ui/native.js` y `js/ui/update.js`: en el navegador no hace nada (salvo «Buscar
+actualizaciones», que allí recarga los archivos nuevos).
 
 ## Pruebas
 
@@ -189,8 +208,9 @@ js/core/              Lógica pura, sin DOM (se prueba en tests/)
   sync                  Fusión a tres bandas para la sincronización
 js/ui/                Pantallas (una por archivo) y piezas comunes (dom.js, store.js, idb.js)
   sync.js               Sincronización: red, claves y pantalla
-  native.js             App de Android: Compartir, botón atrás y aviso de versión nueva
-android-app/          Envoltorio de Android (Capacitor) y apk.yml para GitHub Actions
+  native.js             App de Android: Compartir, botón atrás y puente con el actualizador
+  update.js             Actualizaciones (app de Android y «Buscar actualizaciones» en la web)
+android-app/          Envoltorio de Android (Capacitor), actualizador nativo (nativo/) y apk.yml
 servidor-sync/        Worker de Cloudflare opcional, solo para la sincronización
 tests/                Pruebas (index.html para el navegador, run.mjs para Node)
 sw.js                 Service worker (modo sin conexión)
